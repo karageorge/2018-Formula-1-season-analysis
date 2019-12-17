@@ -1,0 +1,674 @@
+Formula 1 analysis
+================
+
+### Data
+
+<br/>
+
+### Task 1 - Tidy the data (20 marks)
+
+**Comments:** <br /> In order to create the final table the steps were
+the following:<br /> •Unnest list “Race Table” in order to unnest list
+“Races” and then extract the columns of vectors: “round”(the round out
+of 21 of the races in total.),“raceName” and “date” as well as the
+column of lists “Results”. After unnesting “Results” columns
+“position”(drivers position in a particular round),“points”(driver’s
+points in a particular round),“status”(Stating if the driver finished
+the race or in the case he did not what what was the reason.More
+findings on status below.),“driver” and “constructor were extracted
+where the last two of them were lists as well. From”driver" list two
+columns were created named “givenname” and “familyname” and from
+“Constructor” list the column “constructor id” was extracted.<br />
+•Some additional data manipulations were necessary in order to have
+the final product.<br /> -a-First in order to create a new column
+containing the first and last name of each driver, unite function was
+used, merging them in one column seperating them by a space.<br />
+
+\-b-In order to alter the position of each driver in each grand prix
+race to NA in case he didn’t finish the race for any reason the most
+appropriate strategy was to use an ifelse condition changing the
+position to NA for players that had different status than “Finished”.
+However after exploring the data and doing some research on the internet
+about formula championship among others it came to my intention that in
+this data set a driver may have status “+i laps” instead of finished.
+This means that at the time that the winner of the race finished the
+laps this particular driver was i laps behind but that does not mean
+that did not finish the race i.e did not get points. Thus those status
+were treated the same way as the ones named “Finished”. To do so I used
+the ifelse condition with the help of the function str\_detect() which
+returns TRUE or FALSE if a sequence of letters appear in each row of a
+column. As I researched in the internet I saw other status that could be
+treated as finished but as the instructions were to exclude anyone who
+did not finish for any reason I did not proceed to any further
+actions.<br />
+
+\-c-Finally, the desired columns were selected and the appropiate class
+was assigned to the column.<br />
+
+**Task 1 References:**<br />
+
+\#str\_detect():<https://stackoverflow.com/>
+
+``` r
+formula=tibble(f1)%>%
+ unnest_wider(f1)%>%
+  select(RaceTable)%>%
+  unnest_wider(RaceTable)%>%
+  select(Races)%>%
+  unnest_longer(Races)%>%
+  hoist(
+    Races,
+    Race_Round="round",
+    Race_Name="raceName",
+    Race_Date="date",
+    Results="Results"
+  )%>%
+  unnest_longer(Results)%>%
+  hoist(
+    Results,
+    position="position",
+    Points="points",
+    status="status",
+    Driver="Driver",
+    Constructor="Constructor"
+  )%>%
+  hoist(
+    Driver,
+    givenName="givenName",
+    familyName="familyName"
+  )%>%
+  hoist(
+    Constructor,
+    Team="constructorId"
+  )%>%
+  unite(givenName,familyName,col="DriverFullName",sep = " ")%>%
+  mutate(Pos=ifelse(status!="Finished",NA,position))%>%
+  mutate(Position=ifelse(str_detect(status,"Lap")==TRUE,position,Pos))%>%
+  select(Race_Name,Race_Round,Race_Date,DriverFullName,Team,Position,Points)%>%
+  mutate(Race_Round=as.integer(Race_Round),Race_Date=as.Date(Race_Date),Points=as.integer(Points),Position=as.integer(Position))
+head(formula,10)
+```
+
+    ## # A tibble: 10 x 7
+    ##    Race_Name       Race_Round Race_Date  DriverFullName   Team   Position Points
+    ##    <chr>                <int> <date>     <chr>            <chr>     <int>  <int>
+    ##  1 Australian Gra…          1 2018-03-25 Sebastian Vettel ferra…        1     25
+    ##  2 Australian Gra…          1 2018-03-25 Lewis Hamilton   merce…        2     18
+    ##  3 Australian Gra…          1 2018-03-25 Kimi Räikkönen   ferra…        3     15
+    ##  4 Australian Gra…          1 2018-03-25 Daniel Ricciardo red_b…        4     12
+    ##  5 Australian Gra…          1 2018-03-25 Fernando Alonso  mclar…        5     10
+    ##  6 Australian Gra…          1 2018-03-25 Max Verstappen   red_b…        6      8
+    ##  7 Australian Gra…          1 2018-03-25 Nico Hülkenberg  renau…        7      6
+    ##  8 Australian Gra…          1 2018-03-25 Valtteri Bottas  merce…        8      4
+    ##  9 Australian Gra…          1 2018-03-25 Stoffel Vandoor… mclar…        9      2
+    ## 10 Australian Gra…          1 2018-03-25 Carlos Sainz     renau…       10      1
+
+<br/>
+
+### Task 2 - Drivers’ Championship (30 marks)
+
+**Comments:**<br />
+
+•For this part I created a new pivot by shifting the table “formula”
+using pipes making a table in a form that pivot\_wider() could handle in
+order to make the final pivot.As you can see below the table is similar
+to the one of the wikipedia link and it was created by following all the
+instructions.<br />
+
+•For aesthetical reasons and motivation to learn new things, I decided
+to display the pivot table with columns containing not only the hosting
+country of the Grand Prix but also the flags of them. To do so I created
+a new column containing the country codes as displayed in
+“flagpedia.net”, for each corresponding country. After that I
+created a new column called “Country Flags” containing the address
+corresponding to each countries image in “flagpedia.net”. To do so I
+used the sprintf function which replaced the missing code of this link
+with the codes of my previously created column. Finally I united the
+last column with the “Race\_Name” column. The whole idea was based on a
+stackoverflow discussion which you will find in the references
+below.<br />
+
+•Chronological order occured by default so no further actions were
+needed for now. In other parts that chronological order needed to point
+out the appropriate handles were taken.<br />
+
+•In order to present the pivot table in a nicer format I chose to use
+the kable() function which is a function of the knit library, which
+displays a table in a range of formats. My selection for the format was
+“markdown”.
+
+**Task 2 References:**<br /> \#kable
+function:<https://cran.r-project.org> \#flags idea:
+<https://stackoverflow.com/questions/25106481/add-an-image-to-a-table-like-output-in-r>
+
+``` r
+Pivot_2018=formula%>%
+  select(Position,DriverFullName,Race_Name,Points)%>%
+  group_by(DriverFullName)%>%
+  mutate(Total_Points=sum(Points))%>%
+  select(-Points)%>%
+  mutate(Country_code = case_when(
+    Race_Name == "Australian Grand Prix"  ~ 'au',
+    Race_Name == "Chinese Grand Prix"  ~ 'cn',
+    Race_Name == "Azerbaijan Grand Prix" ~ 'az',
+    Race_Name == "Spanish Grand Prix"  ~ 'es',
+    Race_Name == "Monaco Grand Prix"  ~ 'mc',
+    Race_Name == "Canadian Grand Prix"  ~ 'ca',
+    Race_Name == "French Grand Prix"  ~ 'fr',
+    Race_Name == "Austrian Grand Prix"  ~ 'at',
+    Race_Name == "British Grand Prix" ~ 'gb',
+    Race_Name == "German Grand Prix" ~ 'de',
+    Race_Name == "Hungarian Grand Prix" ~ 'hu',
+    Race_Name == "Singapore Grand Prix" ~ 'sg',
+    Race_Name == "Japanese Grand Prix" ~ 'jp',
+    Race_Name == "United States Grand Prix" ~ 'us',
+    Race_Name == "Mexican Grand Prix" ~ 'mx',
+    Race_Name == "Brazilian Grand Prix" ~ 'br',
+    Race_Name == "Abu Dhabi Grand Prix" ~ 'ae',
+    Race_Name == "Belgian Grand Prix" ~ 'be',
+    Race_Name == "Italian Grand Prix" ~ 'it',
+    Race_Name == "Russian Grand Prix" ~ 'ru',
+    TRUE~'na'))%>%
+  mutate(Country_Flag=sprintf("![](http://flagpedia.net/data/flags/mini/%s.png)", Country_code))%>%
+  unite(Race_Name,Country_Flag,col="Race_Name_with_flag",sep = " ")%>%
+  select(-Country_code)%>%
+  pivot_wider(
+    names_from = Race_Name_with_flag,
+    values_from=Position
+  )%>%
+  arrange(-Total_Points)%>%
+  select(-Total_Points,Total_Points)
+  
+kable(Pivot_2018,format="markdown")
+```
+
+| DriverFullName    | Australian Grand Prix ![](http://flagpedia.net/data/flags/mini/au.png) | Bahrain Grand Prix ![](http://flagpedia.net/data/flags/mini/na.png) | Chinese Grand Prix ![](http://flagpedia.net/data/flags/mini/cn.png) | Azerbaijan Grand Prix ![](http://flagpedia.net/data/flags/mini/az.png) | Spanish Grand Prix ![](http://flagpedia.net/data/flags/mini/es.png) | Monaco Grand Prix ![](http://flagpedia.net/data/flags/mini/mc.png) | Canadian Grand Prix ![](http://flagpedia.net/data/flags/mini/ca.png) | French Grand Prix ![](http://flagpedia.net/data/flags/mini/fr.png) | Austrian Grand Prix ![](http://flagpedia.net/data/flags/mini/at.png) | British Grand Prix ![](http://flagpedia.net/data/flags/mini/gb.png) | German Grand Prix ![](http://flagpedia.net/data/flags/mini/de.png) | Hungarian Grand Prix ![](http://flagpedia.net/data/flags/mini/hu.png) | Belgian Grand Prix ![](http://flagpedia.net/data/flags/mini/be.png) | Italian Grand Prix ![](http://flagpedia.net/data/flags/mini/it.png) | Singapore Grand Prix ![](http://flagpedia.net/data/flags/mini/sg.png) | Russian Grand Prix ![](http://flagpedia.net/data/flags/mini/ru.png) | Japanese Grand Prix ![](http://flagpedia.net/data/flags/mini/jp.png) | United States Grand Prix ![](http://flagpedia.net/data/flags/mini/us.png) | Mexican Grand Prix ![](http://flagpedia.net/data/flags/mini/mx.png) | Brazilian Grand Prix ![](http://flagpedia.net/data/flags/mini/br.png) | Abu Dhabi Grand Prix ![](http://flagpedia.net/data/flags/mini/ae.png) | Total\_Points |
+| :---------------- | ---------------------------------------------------------------------: | ------------------------------------------------------------------: | ------------------------------------------------------------------: | ---------------------------------------------------------------------: | ------------------------------------------------------------------: | -----------------------------------------------------------------: | -------------------------------------------------------------------: | -----------------------------------------------------------------: | -------------------------------------------------------------------: | ------------------------------------------------------------------: | -----------------------------------------------------------------: | --------------------------------------------------------------------: | ------------------------------------------------------------------: | ------------------------------------------------------------------: | --------------------------------------------------------------------: | ------------------------------------------------------------------: | -------------------------------------------------------------------: | ------------------------------------------------------------------------: | ------------------------------------------------------------------: | --------------------------------------------------------------------: | --------------------------------------------------------------------: | ------------: |
+| Lewis Hamilton    |                                                                      2 |                                                                   3 |                                                                   4 |                                                                      1 |                                                                   1 |                                                                  3 |                                                                    5 |                                                                  1 |                                                                   NA |                                                                   2 |                                                                  1 |                                                                     1 |                                                                   2 |                                                                   1 |                                                                     1 |                                                                   1 |                                                                    1 |                                                                         3 |                                                                   4 |                                                                     1 |                                                                     1 |           408 |
+| Sebastian Vettel  |                                                                      1 |                                                                   1 |                                                                   8 |                                                                      4 |                                                                   4 |                                                                  2 |                                                                    1 |                                                                  5 |                                                                    3 |                                                                   1 |                                                                 NA |                                                                     2 |                                                                   1 |                                                                   4 |                                                                     3 |                                                                   3 |                                                                    6 |                                                                         4 |                                                                   2 |                                                                     6 |                                                                     2 |           320 |
+| Kimi Räikkönen    |                                                                      3 |                                                                  NA |                                                                   3 |                                                                      2 |                                                                  NA |                                                                  4 |                                                                    6 |                                                                  3 |                                                                    2 |                                                                   3 |                                                                  3 |                                                                     3 |                                                                  NA |                                                                   2 |                                                                     5 |                                                                   4 |                                                                    5 |                                                                         1 |                                                                   3 |                                                                     3 |                                                                    NA |           251 |
+| Max Verstappen    |                                                                      6 |                                                                  NA |                                                                   5 |                                                                     NA |                                                                   3 |                                                                  9 |                                                                    3 |                                                                  2 |                                                                    1 |                                                                  NA |                                                                  4 |                                                                    NA |                                                                   3 |                                                                   5 |                                                                     2 |                                                                   5 |                                                                    3 |                                                                         2 |                                                                   1 |                                                                     2 |                                                                     3 |           249 |
+| Valtteri Bottas   |                                                                      8 |                                                                   2 |                                                                   2 |                                                                     NA |                                                                   2 |                                                                  5 |                                                                    2 |                                                                  7 |                                                                   NA |                                                                   4 |                                                                  2 |                                                                     5 |                                                                   4 |                                                                   3 |                                                                     4 |                                                                   2 |                                                                    2 |                                                                         5 |                                                                   5 |                                                                     5 |                                                                     5 |           247 |
+| Daniel Ricciardo  |                                                                      4 |                                                                  NA |                                                                   1 |                                                                     NA |                                                                   5 |                                                                  1 |                                                                    4 |                                                                  4 |                                                                   NA |                                                                   5 |                                                                 NA |                                                                     4 |                                                                  NA |                                                                  NA |                                                                     6 |                                                                   6 |                                                                    4 |                                                                        NA |                                                                  NA |                                                                     4 |                                                                     4 |           170 |
+| Nico Hülkenberg   |                                                                      7 |                                                                   6 |                                                                   6 |                                                                     NA |                                                                  NA |                                                                  8 |                                                                    7 |                                                                  9 |                                                                   NA |                                                                   6 |                                                                  5 |                                                                    12 |                                                                  NA |                                                                  13 |                                                                    10 |                                                                  12 |                                                                   NA |                                                                         6 |                                                                   6 |                                                                    NA |                                                                    NA |            69 |
+| Sergio Pérez      |                                                                     11 |                                                                  16 |                                                                  12 |                                                                      3 |                                                                   9 |                                                                 12 |                                                                   14 |                                                                 NA |                                                                    7 |                                                                  10 |                                                                  7 |                                                                    14 |                                                                   5 |                                                                   7 |                                                                    16 |                                                                  10 |                                                                    7 |                                                                         8 |                                                                  NA |                                                                    10 |                                                                     8 |            62 |
+| Kevin Magnussen   |                                                                     NA |                                                                   5 |                                                                  10 |                                                                     13 |                                                                   6 |                                                                 13 |                                                                   13 |                                                                  6 |                                                                    5 |                                                                   9 |                                                                 11 |                                                                     7 |                                                                   8 |                                                                  16 |                                                                    18 |                                                                   8 |                                                                   NA |                                                                        NA |                                                                  15 |                                                                     9 |                                                                    10 |            56 |
+| Carlos Sainz      |                                                                     10 |                                                                  11 |                                                                   9 |                                                                      5 |                                                                   7 |                                                                 10 |                                                                    8 |                                                                  8 |                                                                   12 |                                                                  NA |                                                                 12 |                                                                     9 |                                                                  11 |                                                                   8 |                                                                     8 |                                                                  17 |                                                                   10 |                                                                         7 |                                                                  NA |                                                                    12 |                                                                     6 |            53 |
+| Fernando Alonso   |                                                                      5 |                                                                   7 |                                                                   7 |                                                                      7 |                                                                   8 |                                                                 NA |                                                                   NA |                                                                 NA |                                                                    8 |                                                                   8 |                                                                 NA |                                                                     8 |                                                                  NA |                                                                  NA |                                                                     7 |                                                                  14 |                                                                   14 |                                                                        NA |                                                                  NA |                                                                    17 |                                                                    11 |            50 |
+| Esteban Ocon      |                                                                     12 |                                                                  10 |                                                                  11 |                                                                     NA |                                                                  NA |                                                                  6 |                                                                    9 |                                                                 NA |                                                                    6 |                                                                   7 |                                                                  8 |                                                                    13 |                                                                   6 |                                                                   6 |                                                                    NA |                                                                   9 |                                                                    9 |                                                                        NA |                                                                  11 |                                                                    15 |                                                                    NA |            49 |
+| Charles Leclerc   |                                                                     13 |                                                                  12 |                                                                  19 |                                                                      6 |                                                                  10 |                                                                 NA |                                                                   10 |                                                                 10 |                                                                    9 |                                                                  NA |                                                                 15 |                                                                    NA |                                                                  NA |                                                                  11 |                                                                     9 |                                                                   7 |                                                                   NA |                                                                        NA |                                                                   7 |                                                                     7 |                                                                     7 |            39 |
+| Romain Grosjean   |                                                                     NA |                                                                  13 |                                                                  17 |                                                                     NA |                                                                  NA |                                                                 15 |                                                                   12 |                                                                 11 |                                                                    4 |                                                                  NA |                                                                  6 |                                                                    10 |                                                                   7 |                                                                  NA |                                                                    15 |                                                                  11 |                                                                    8 |                                                                        NA |                                                                  16 |                                                                     8 |                                                                     9 |            37 |
+| Pierre Gasly      |                                                                     NA |                                                                   4 |                                                                  18 |                                                                     12 |                                                                  NA |                                                                  7 |                                                                   11 |                                                                 NA |                                                                   11 |                                                                  13 |                                                                 14 |                                                                     6 |                                                                   9 |                                                                  14 |                                                                    13 |                                                                  NA |                                                                   11 |                                                                        12 |                                                                  10 |                                                                    13 |                                                                    NA |            29 |
+| Stoffel Vandoorne |                                                                      9 |                                                                   8 |                                                                  13 |                                                                      9 |                                                                  NA |                                                                 14 |                                                                   16 |                                                                 12 |                                                                   NA |                                                                  11 |                                                                 13 |                                                                    NA |                                                                  15 |                                                                  12 |                                                                    12 |                                                                  16 |                                                                   15 |                                                                        11 |                                                                   8 |                                                                    14 |                                                                    14 |            12 |
+| Marcus Ericsson   |                                                                     NA |                                                                   9 |                                                                  16 |                                                                     11 |                                                                  13 |                                                                 11 |                                                                   15 |                                                                 13 |                                                                   10 |                                                                  NA |                                                                  9 |                                                                    15 |                                                                  10 |                                                                  15 |                                                                    11 |                                                                  13 |                                                                   12 |                                                                        10 |                                                                   9 |                                                                    NA |                                                                    NA |             9 |
+| Lance Stroll      |                                                                     14 |                                                                  14 |                                                                  14 |                                                                      8 |                                                                  11 |                                                                 17 |                                                                   NA |                                                                 NA |                                                                   14 |                                                                  12 |                                                                 NA |                                                                    17 |                                                                  13 |                                                                   9 |                                                                    14 |                                                                  15 |                                                                   17 |                                                                        14 |                                                                  12 |                                                                    18 |                                                                    13 |             6 |
+| Brendon Hartley   |                                                                     15 |                                                                  17 |                                                                  NA |                                                                     10 |                                                                  12 |                                                                 NA |                                                                   NA |                                                                 14 |                                                                   NA |                                                                  NA |                                                                 10 |                                                                    11 |                                                                  14 |                                                                  NA |                                                                    17 |                                                                  NA |                                                                   13 |                                                                         9 |                                                                  14 |                                                                    11 |                                                                    12 |             4 |
+| Sergey Sirotkin   |                                                                     NA |                                                                  15 |                                                                  15 |                                                                     NA |                                                                  14 |                                                                 16 |                                                                   17 |                                                                 15 |                                                                   13 |                                                                  14 |                                                                 NA |                                                                    16 |                                                                  12 |                                                                  10 |                                                                    19 |                                                                  18 |                                                                   16 |                                                                        13 |                                                                  13 |                                                                    16 |                                                                    15 |             1 |
+
+<br/>
+
+### Task 3 - Cumulative Constructors (30 marks)
+
+**Comments:**<br />
+
+•For this part I created a new pivot having as a start point the
+“formula” table from task 1.I grouped the rows by race name and team
+and I created a new column called “Total\_Points” containing the summary
+of the points each team earned in each race which result on having 2
+same “Total\_Points” values for each team in each race. Thus I used
+distinct to keep only one for each race.After that I grouped the rows by
+team and created a new column containg the cummulative points summaries
+of each team for every race until the last one. At the same time I added
+another column named “Team\_Total\_points” containing the maximum value
+of “Total\_Points” of each team i.e the cummulative summaries
+corresponding to the last race which was in Abu Dhabi. The reason I
+created this column will be explained shortly. After that I created a
+pivot having as columns the name of the teams and the names of the races
+of Grand Prix. The values inside the pivot table are the
+“Total\_Points”.<br />
+
+•The reason of “Team\_Total\_points” may be clear now. My columns are
+Grand Prix Names so I thought that it is accurate to arrange my pivot
+according to a known column rather than searching which was the last
+race name. The idea was that it would be more usefull and efficient if
+we were to add more races in the championship.<br />
+
+•Chronological order occured by default so no further actions were
+needed for now. In other parts that chronological order needed to point
+out the appropriate handles were taken.<br />
+
+``` r
+Pivot_Task_3=formula%>%
+  select(Race_Name,Points,Team)%>%
+  group_by(Team,Race_Name)%>%
+  mutate(Total_Points=cumsum(Points))%>%
+  distinct(Race_Name,Team,Total_Points=max(Total_Points))%>%
+  group_by(Team)%>%
+  mutate(Total_Points=cumsum(Total_Points))%>%
+  group_by(Team)%>%
+  mutate(Team_Total_Points=max(Total_Points))%>%
+  pivot_wider(
+    names_from = Race_Name,
+    values_from=Total_Points
+  )%>%
+  arrange(-Team_Total_Points)%>%
+  select(-Team_Total_Points)
+kable(Pivot_Task_3, format = "markdown")
+```
+
+| Team         | Australian Grand Prix | Bahrain Grand Prix | Chinese Grand Prix | Azerbaijan Grand Prix | Spanish Grand Prix | Monaco Grand Prix | Canadian Grand Prix | French Grand Prix | Austrian Grand Prix | British Grand Prix | German Grand Prix | Hungarian Grand Prix | Belgian Grand Prix | Italian Grand Prix | Singapore Grand Prix | Russian Grand Prix | Japanese Grand Prix | United States Grand Prix | Mexican Grand Prix | Brazilian Grand Prix | Abu Dhabi Grand Prix |
+| :----------- | --------------------: | -----------------: | -----------------: | --------------------: | -----------------: | ----------------: | ------------------: | ----------------: | ------------------: | -----------------: | ----------------: | -------------------: | -----------------: | -----------------: | -------------------: | -----------------: | ------------------: | -----------------------: | -----------------: | -------------------: | -------------------: |
+| mercedes     |                    22 |                 55 |                 85 |                   110 |                153 |               178 |                 206 |               237 |                 237 |                267 |               310 |                  345 |                375 |                415 |                  452 |                495 |                 538 |                      563 |                585 |                  620 |                  655 |
+| ferrari      |                    40 |                 65 |                 84 |                   114 |                126 |               156 |                 189 |               214 |                 247 |                287 |               302 |                  335 |                360 |                390 |                  415 |                442 |                 460 |                      497 |                530 |                  553 |                  571 |
+| red\_bull    |                    20 |                 20 |                 55 |                    55 |                 80 |               107 |                 134 |               164 |                 189 |                199 |               211 |                  223 |                238 |                248 |                  274 |                292 |                 319 |                      337 |                362 |                  392 |                  419 |
+| renault      |                     7 |                 15 |                 25 |                    35 |                 41 |                46 |                  56 |                62 |                  62 |                 70 |                80 |                   82 |                 82 |                 86 |                   91 |                 91 |                  92 |                      106 |                114 |                  114 |                  122 |
+| force\_india |                     0 |                  1 |                  1 |                    16 |                 18 |                26 |                  28 |                28 |                  42 |                 49 |                59 |                   59 |                 77 |                 91 |                   91 |                 94 |                 102 |                      106 |                106 |                  107 |                  111 |
+| haas         |                     0 |                 10 |                 11 |                    11 |                 19 |                19 |                  19 |                27 |                  49 |                 51 |                59 |                   66 |                 76 |                 76 |                   76 |                 80 |                  84 |                       84 |                 84 |                   90 |                   93 |
+| mclaren      |                    12 |                 22 |                 28 |                    36 |                 40 |                40 |                  40 |                40 |                  44 |                 48 |                48 |                   52 |                 52 |                 52 |                   58 |                 58 |                  58 |                       58 |                 62 |                   62 |                   62 |
+| sauber       |                     0 |                  2 |                  2 |                    10 |                 11 |                11 |                  12 |                13 |                  16 |                 16 |                18 |                   18 |                 19 |                 19 |                   21 |                 27 |                  27 |                       28 |                 36 |                   42 |                   48 |
+| toro\_rosso  |                     0 |                 12 |                 12 |                    13 |                 13 |                19 |                  19 |                19 |                  19 |                 19 |                20 |                   28 |                 30 |                 30 |                   30 |                 30 |                  30 |                       32 |                 33 |                   33 |                   33 |
+| williams     |                     0 |                  0 |                  0 |                     4 |                  4 |                 4 |                   4 |                 4 |                   4 |                  4 |                 4 |                    4 |                  4 |                  7 |                    7 |                  7 |                   7 |                        7 |                  7 |                    7 |                    7 |
+
+<br/>
+
+### Task 4 - Visualization (20 marks)
+
+**Comment about plots colors:**<br/>
+
+•The baseline for all of the plots below is ggplot from the library
+“ggplot2”<br/>
+
+•The color selection on all the plots above was from the packages
+“viridis” and “RcolorBrewer” two of the libraries that have the most
+appealing palettes in my opinion.<br/>
+
+•In order to portrait 2 or more plots together in our preferable
+position and form the package “patchwork” was used.<br/>
+
+**Visualisation Part 1: “Overall Visualization”**<br/>
+
+``` r
+p1_1=formula%>%
+  select(Race_Date,Points,Team)%>%
+  group_by(Team,Race_Date)%>%
+  mutate(Total_Points=sum(Points))%>%
+  select(-Points)%>%
+  distinct(Race_Date,Team,Total_Points)%>%
+  group_by(Team)%>%
+  mutate(Total_cum_Points=cumsum(Total_Points))%>%
+  ggplot(aes(x = Race_Date, y = Total_cum_Points)) +
+  geom_line(aes(colour = factor(Team),group=Team))+ 
+  geom_point(aes(colour = factor(Team),group=Team))+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_viridis_d()+
+  labs(title = "Teams progression during the F1 championship 2018",x="Period during the championship",y="Cumulative points earned by both drivers of each team")
+```
+
+**Comments on Plot 1:**<br/> •In the first plot the overall performance
+of all the teams participated in formula 1 championship 2018 is
+illustrated. As we can clearly observe, the winner was Mercedes and the
+in the second place comes Ferrari. While red\_bull had small some
+distance from the other two teams all the remaining teams seem to had
+huge distances from the top 3 through out the whole game.<br/>
+
+•I chose to display an animated figure showing the cummulative gathering
+of points from every team through out the races because it illustrates
+better the results.<br/>
+
+•From what we just observed it may be interesting to investigate in more
+depth the behavior of mercedes and ferrari later on.<br/>
+
+**Plot 1:**<br/> •Used the main table “formula” transforming it to the
+form that we would have the cummulative point summaries of the teams
+throughout the championship. “Race\_Date” was chosen for animated plot
+purposes. Details will be stated below.<br/>
+
+•For the animated plot we used 3 functions corresponding to different
+libraries. To begin with the libraries used were “gganimate” and
+“magick”. The transition\_reveal was used in order to state which
+chronological order should be followed by the animation and here I chose
+the date of the races. The purpose of the renderer function is to take a
+list of image files and assemble them into an animation. “gganimate” has
+a “gifski” renderer by default but still works with other ones.As I was
+unable to install this package due to R version issues I used “magick”
+renderer.<br/>
+
+**Plot 1 References:**<br/> \#the main idea was inspired by the
+article:datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/
+<br/> \#the gganimate package belongs to:
+<https://github.com/thomasp85/gganimate>
+
+``` r
+animate(p1_1+transition_reveal(Race_Date),renderer = magick_renderer())
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-5-1.gif)<!-- -->
+
+``` r
+formula$Race_Name=factor(formula$Race_Name, levels=c("Australian Grand Prix", "Bahrain Grand Prix", "Chinese Grand Prix","Azerbaijan Grand Prix","Spanish Grand Prix","Monaco Grand Prix","Canadian Grand Prix","French Grand Prix","Austrian Grand Prix","British Grand Prix","German Grand Prix","Hungarian Grand Prix","Belgian Grand Prix","Italian Grand Prix","Singapore Grand Prix","Russian Grand Prix","Japanese Grand Prix","United States Grand Prix","Mexican Grand Prix","Brazilian Grand Prix","Abu Dhabi Grand Prix"))
+plot1_2=formula%>%
+  group_by(DriverFullName)%>%
+  mutate(PlayerTotalPoints=sum(Points))%>%
+  ggplot(aes(x=Points/PlayerTotalPoints,fill=factor(DriverFullName)))+
+  geom_density(alpha=0.5)+
+  facet_grid(rows=vars(Team))+
+  theme_classic()+
+  scale_fill_viridis_d(option="viridis")+
+  labs(title="Distribution of points earned by drivers of each team.",x=" Driver's points divided by total points of player")
+```
+
+**Comments on Plot 2:**<br/>
+
+•In the second plot the distribution of the points of all the drivers
+per team during the shampionship is illustrated. This help us to have a
+better undestanding of the contribution each driver had in his
+team.<br/>
+
+**Plot 2:**<br/>
+
+•Used the same procedure as before in order to create the desirable
+table.<br/>
+
+•The new library used for the visualization is “scales” which contains
+the function “alpha” for modifying colour transparency. Here we used
+facet\_grid in order to create different density plots for the drivers
+of each team.<br/>
+
+•Also I factorized Race\_Name with the purpose of giving the correct
+order to the levels i.e the countries hosted the Grand Prix because we
+will need that order for our plots.<br/>
+
+``` r
+plot1_2
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+``` r
+#ferrari
+ferp1=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="ferrari")%>%
+  ggplot(aes(x=DriverFullName,y=Points,group=DriverFullName,color=factor(DriverFullName)))+
+  geom_count()+
+  theme_minimal()+
+  scale_color_brewer(palette = "Reds")+
+  theme(legend.position="left")+
+  labs(title = "Counts chart of the frequency of points that each Ferrari driver earned during the tournament.",x="Driver Names")
+ferp2=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="ferrari")%>%
+  group_by(Race_Name)%>%
+  mutate(Percentage=round((Points/sum(Points))*100,digits=0))%>%
+  ggplot(aes(DriverFullName, Race_Name, fill = Percentage)) +
+  geom_tile() +
+  geom_text(aes(label = paste0(Percentage, "%")), color = "white")+
+  theme_minimal()+
+  scale_fill_viridis(option="viridis")+
+  labs(title = "Table of each Ferrari driver contribution percentages",x="Driver Names","Country hosting the championship")
+ferp3=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="ferrari")%>%
+  mutate(TotalPoints=Points/sum(Points))%>%
+  group_by(DriverFullName)%>%
+  summarise(TotalPercentage=sum(TotalPoints))%>%
+  ggplot(aes(x="",y=TotalPercentage*100,fill=DriverFullName))+
+  geom_bar(width = 1, stat = "identity")+ 
+  coord_polar("y", start=0)+
+  theme_minimal()+
+  scale_fill_brewer(palette = "Reds")+
+  labs(title="Pie chart of the total contribution of each Ferrari driver in the championship",x="Percentage")
+#mercedes
+merp1=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="mercedes")%>%
+  ggplot(aes(x=DriverFullName,y=Points,group=DriverFullName,color=factor(DriverFullName)))+
+  geom_count()+
+  theme_minimal()+
+  scale_color_brewer(palette = "PuRd")+
+  theme(legend.position="left")+
+  labs(title = "Counts chart of the frequency of points that each Mercedes driver earned during the tournament.",x="Driver Names")
+merp2=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="mercedes")%>%
+  group_by(Race_Name)%>%
+  mutate(Percentage=round((Points/sum(Points))*100,digits=0))%>%
+  filter(Race_Name!="Austrian Grand Prix")%>%
+  ggplot(aes(DriverFullName, Race_Name, fill = Percentage)) +
+  geom_tile() +
+  geom_text(aes(label = paste0(Percentage, "%")), color = "white")+
+  theme_minimal()+
+  scale_fill_viridis(option="magma")+
+  labs(subtitle="Note:We excluded Austrian Grand Prix as Mercedes earned 0 points so there was no contribution from both drivers.",title = "Table of each Mercedes driver contribution percentages",x="Driver Names","Country hosting the championship")
+merp3=formula%>%
+  select(Race_Name,DriverFullName,Points,Team)%>%
+  filter(Team=="mercedes")%>%
+  mutate(TotalPoints=Points/sum(Points))%>%
+  group_by(DriverFullName)%>%
+  summarise(TotalPercentage=sum(TotalPoints))%>%ggplot(aes(x="",y=TotalPercentage*100,fill=DriverFullName))+
+  geom_bar(width = 1, stat = "identity")+ 
+  coord_polar("y", start=0)+
+  theme_minimal()+
+  scale_fill_brewer(palette = "Greys")+
+  labs(title="Pie chart of the total contribution of each Mercedes driver in the championship",x="Percentage")
+```
+
+**Visualisation Part 2: “Comparisons between Mercedes and
+Ferrari”**<br/>
+
+**General comments about visualisation Part 2:**<br/>
+
+•In this section we try to see more explicit insights on the top 2 teams
+of the championship.<br/>
+
+**Comments on count chart plots:**<br/> •In the counts chart we can make
+the conclusion that the better perfomarce among all was the one of
+Mercedes driver Lewis Hamilton who earned 10 times the first place over
+the races giving his team 25 points each time. As for Ferrari we can see
+that overall Sebastian Vettel had outstanding performance with his
+biggest accomplishment being in first place 6 times. As for Sebastian
+Vettel’s teammate Kimi Räikkönen we can say that his performance was
+average as he gained zero points for 6 races leaving his team behind.
+That could be one of the reasons that ferrari lost the first place and
+we should investegate it more. <br/>
+
+**Plots-Counts Chart:**<br/> •First I used pipes on the main table to
+filter only Ferrari and then created a counts chart by adding the
+geom\_count() function to the ggplot. Counts chart counts the frequency
+of values. Here I chose to use as a factor the drivers names in order to
+see the points each of them gathered. The exact same procedure was
+followed for Mercedes.<br/>
+
+**References for counts charts:**<br/>
+<http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html>
+
+``` r
+ferp1/merp1
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+**Comments on table chart plots:**<br/> •In this charts we can see the
+contribution that each driver had in every race for his team. As colors
+getting darker the percentage of contribution decreases. That being said
+we can see that Mercedes driver Valtteri Bottas had the less
+contribution compared to his teammate in every race except from the race
+in Canadian Grand Prix where he had 64%. That does not necessarily mean
+that he perfmormed badly taking into consideration that his teammate has
+the most outstanding performance of all drivers.<br/>
+
+**Plots-table charts:**<br/> •First I used pipes on the main table to
+filter only Ferrari and then created a column which had the points of
+each player in a particular race divided by the total points of each
+turn.After multiplying it by 100, the values became percentages and the
+table charts were created by adding the geom\_tile() function to the
+ggplot.The exact same procedure was followed for Mercedes.<br/>
+
+**References for table chart:**<br/>
+<https://www.r-bloggers.com/how-to-replace-a-pie-chart/>
+
+``` r
+ferp2/merp2
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+**Comments on pie chart plots:**<br/> •Below the percentage of each
+team’s drivers is illustrated by a simple pie chart. As expected the
+biggest impact in Mercedes team was the one of Lewis Hamilton with
+almost 60% overall. In ferrari we do not see something oustanding with
+respect to the total contribution of its drivers.<br/>
+
+``` r
+ferp3/merp3
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+``` r
+plot1=formula%>%
+  select(Race_Name,Points,Team)%>%
+  group_by(Team,Race_Name)%>%
+  mutate(Total_Points=sum(Points))%>%
+  select(-Points)%>%
+  distinct(Race_Name,Team,Total_Points)%>%
+  group_by(Team)%>%
+  mutate(Total_cum_Points=cumsum(Total_Points))%>%
+  filter(Team=="ferrari" |Team== "mercedes")%>%
+  ggplot(aes(x = Race_Name, y = Total_cum_Points)) +
+  geom_line(aes(colour = factor(Team),group=Team),size=1.5)+ 
+  geom_point(aes(colour = factor(Team),group=Team,size=1.3)) +
+  theme_classic()+
+  geom_text(aes(label=Total_cum_Points,color=factor(Team)),hjust=1, vjust=0,size=5.5,check_overlap = TRUE) +
+  theme(plot.title=element_text(size = 13),
+        axis.text.x = element_text(angle = 90,color="white",size=10),
+        axis.line = element_line(size = 2, colour = "white"),
+        axis.text.y=element_text(color="white",size=15),
+        axis.title.y = element_text(color="black",size = 13),
+        axis.title.x = element_text(size = 14, color="black"))+
+  geom_hline(yintercept = 237, linetype="dotted", color = "grey", size=1.5)+
+  geom_vline(xintercept = 9, linetype="dotted", color = "white", size=1.5)+
+  geom_vline(xintercept = 11, linetype="dotted", color = "white", size=1.5)+
+  labs(title = "Intresting insights from closely observing the top three teams",
+       x="Country hosting the championship",
+       y="Cumulative points earned by both drivers of each team")+
+  scale_color_brewer(palette = "Set3")
+img1 = "https://imagesvc.timeincapp.com/v3/fan/image?url=https%3A%2F%2Fbeyondtheflag.com%2Fwp-content%2Fuploads%2Fgetty-images%2F2017%2F10%2F682968556-spanish-f1-grand-prix.jpg.jpg&c=sc&w=4375&h=2917&fbclid=IwAR3_f__wRXBi5qeDrVNsYsAFG7zy_iLfhCcrQgU6q2wPT08BFkDKfD1wOAk"
+ggbackground(plot1, img1)
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+**Visualisation Part 3: “Assumpsions and Tests between Mercedes and
+Ferrari”**<br/>
+
+**General comments about visualisation Part 3:**<br/>
+
+•After we have observed in depth those two teams it is time to dig
+little deeper and see if under different conditions the outcome of the
+championship (first place) may be different. In this figure we gather
+the cumulative summarise of the points that each team got during the
+races. The main purpose of this plot it to point out any strange
+behavior of team’s performances. And see if we can discover evidence
+that could work on developing different scenarios.<br/>
+
+**Comments:**<br/> •First of all it is more clear now to observe that
+during the Austrian Grand Prix Mercedes earned 0 points.<br/>
+
+•Mercedes seems to be first through the championship except from the
+period of Austrian Grand Prix and British Grand Prix (space defined by
+the vertical lines).<br/>
+
+•Overall from our visual representation it is safe to say that until
+approximately the Hungarian Grand Prix the two teams are evenly matched
+with Mercedes having a small lead for the most part.<br/>
+
+**Questions:**<br/> •Is the reason that Ferrari went ahead for the
+period of 2 races caused to the bad perfomarnce of Mercedes?<br/>
+
+•Is it because Ferraris drivers performed better?If so why did Ferrari
+lost the first place? Is it that after that time its players started to
+perform less efficient than before?<br/>
+
+**Plot:**<br/> • For this plot formula table was manipulated and
+filtered to result to the cummulative summaries of ferrari and mercedes
+teams.After that a simple line plot was created adding the points and
+their values separeting them by color(with the factor being the team).2
+verical lines were drawn in order to point out the space where ferrari
+was leading and one red horizontical line was drawn so as to point out
+the time were both mercedes players earned 0 points.<br/>
+
+• Here for aesthetic purposes I chose to change the background with an
+image from the 2018 F1 Championship. This was feasible through the
+function ggbackground() which is from the library ggimage().<br/>
+
+**References:**<br/>
+<https://guangchuangyu.github.io/2018/04/setting-ggplot2-background-with-ggbackground/>
+
+``` r
+plot2=formula%>%
+  select(Race_Round,Points,Team)%>%
+  group_by(Team,Race_Round)%>%
+  mutate(Total_Points=sum(Points))%>%
+  select(-Points)%>%
+  distinct(Race_Round,Team,Total_Points)%>%
+  group_by(Team)%>%
+  mutate(Total_cum_Points=cumsum(Total_Points))%>%
+  filter(Team=="ferrari" |Team== "mercedes")%>%
+  filter(Race_Round==8 | Race_Round==9| Race_Round==10)%>%
+  ggplot(aes(x = Race_Round, y = Total_cum_Points,group=Team,colour=factor(Team))) +
+  geom_point(aes(colour = factor(Team),group=Team)) +
+  geom_text(aes(label=Total_cum_Points,colour=factor(Team)),hjust=-1, vjust=0,size=5) +
+  geom_smooth(method="lm", se=FALSE, fullrange=TRUE)+
+  theme_classic()+
+  theme(axis.text.y = element_text(size=15.5,color="white"),
+        axis.line = element_line(size = 2, colour = "white"),
+        legend.title = element_text(color = "white"),
+        legend.text = element_text(color = "white"))+
+  scale_color_brewer(palette = "YIGnBu")+
+  xlim(0, 21)+
+  labs(title = "Hypothetical scenario-Predictions",x="Tournament rounds into numbers",y="Cummulative points")
+  
+img2 = "https://s.hs-data.com/picmon/39/2VHT_1d2LpD_l.jpg?fbclid=IwAR37opaZFOtUoqIHnkkVoWdGptTKE-A1lrHK10e0u2Na2UNS3PhvrchO2wY"
+ggbackground(plot2, img2)
+```
+
+![](formula_1_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+**Visualisation Part 4: “Hypothetical Scenarios and Predictions between
+Mercedes and Ferrari”**<br/>
+
+•As stated above, after observing a space were Ferrari was ahead of
+Mercedes I wanted to see in a stressed scenario if the first place could
+differ. That being said some excessive assumptions were made to create a
+not so realistic outcome but still plausible.<br/> •There are numerous
+ways of performing the following analysis with much greater statistical
+accuracy but this is just a demonstration of visualization outcomes and
+tells a story so we will study this scenario solely to the visualization
+tools without doing any addition statistical function or way of
+thinking.<br/> •The hypothesis made here is what if the perfomance of
+these two teams were based only on their perfomance during the French
+Austrian and British Grand Prix.That may be a due to a great performance
+on behald of Ferrari, in a worse perfomance of mercedes or a combination
+of both. To visualize this I took only those 3 points and took their
+linear regression lines to see their expands or even better their
+predictions.<br/>
+
+**Comments:**<br/> •Under these assumptions our prediction indicates
+that ferrari would win. <br/>
+
+**CONCLUSION:**
+
+•To sum up we started by observing the whole teams-drivers during the
+championship and pointed out Mercedes and Ferrari as they seem to be
+equally matched throughout the championship.<br/> •Then we decided to
+discover in more detail the stats of each of those teams as well as
+those of their drivers.<br/> •Finally we saw that there was a time when
+Ferrari went ahead and then eventually lost so the idea was to study a
+scenario where Ferrari could have won.<br/> •We made a prediction based
+on some assumptions by using only plots.<br/>
+
+–Thanks for reading\!–
+
+\`\`\` <br/>
